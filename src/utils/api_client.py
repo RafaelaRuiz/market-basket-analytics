@@ -1,0 +1,124 @@
+"""
+Cliente HTTP para consumir la FastAPI desde Streamlit.
+
+Lee la variable de entorno API_URL (default: http://localhost:8000).
+Todas las funciones retornan DataFrames de pandas listos para usar en
+las funciones de visualización.
+"""
+
+import os
+from datetime import date
+
+import pandas as pd
+import requests
+
+_API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
+_PREFIX  = f"{_API_URL}/api/v1"
+_TIMEOUT = 30  # segundos
+
+
+def _get(endpoint: str, params: dict | None = None) -> list | dict:
+    """Hace GET a {_PREFIX}/{endpoint} y retorna el JSON parseado."""
+    url = f"{_PREFIX}/{endpoint}"
+    resp = requests.get(url, params={k: v for k, v in (params or {}).items()
+                                     if v is not None}, timeout=_TIMEOUT)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _post(endpoint: str, json_body: dict | None = None) -> dict:
+    url = f"{_PREFIX}/{endpoint}"
+    resp = requests.post(url, json=json_body or {}, timeout=_TIMEOUT)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _build_params(tienda=None, fecha_ini=None, fecha_fin=None) -> dict:
+    return {
+        "tienda":    tienda if tienda != "Todas" else None,
+        "fecha_ini": fecha_ini.isoformat() if isinstance(fecha_ini, date) else fecha_ini,
+        "fecha_fin": fecha_fin.isoformat() if isinstance(fecha_fin, date) else fecha_fin,
+    }
+
+
+# ─── Summary ─────────────────────────────────────────────────────────────────
+
+def get_summary(tienda=None, fecha_ini=None, fecha_fin=None) -> dict:
+    """KPIs principales: totales, clientes, deltas."""
+    return _get("summary", _build_params(tienda, fecha_ini, fecha_fin))
+
+
+# ─── Products ────────────────────────────────────────────────────────────────
+
+def get_top_products(n=10, tienda=None, fecha_ini=None,
+                     fecha_fin=None) -> pd.DataFrame:
+    data = _get("products/top",
+                {"n": n, **_build_params(tienda, fecha_ini, fecha_fin)})
+    return pd.DataFrame(data)
+
+
+# ─── Customers ───────────────────────────────────────────────────────────────
+
+def get_top_customers(n=10, tienda=None, fecha_ini=None,
+                      fecha_fin=None) -> pd.DataFrame:
+    data = _get("customers/top",
+                {"n": n, **_build_params(tienda, fecha_ini, fecha_fin)})
+    return pd.DataFrame(data)
+
+
+def get_customer_features(tienda=None) -> pd.DataFrame:
+    params = {"tienda": tienda if tienda != "Todas" else None}
+    data = _get("customers/features", params)
+    return pd.DataFrame(data)
+
+
+# ─── Daily ───────────────────────────────────────────────────────────────────
+
+def get_daily(tienda=None, fecha_ini=None, fecha_fin=None) -> pd.DataFrame:
+    data = _get("daily", _build_params(tienda, fecha_ini, fecha_fin))
+    df = pd.DataFrame(data)
+    if not df.empty:
+        df["fecha"] = pd.to_datetime(df["fecha"])
+    return df
+
+
+# ─── Categories ──────────────────────────────────────────────────────────────
+
+def get_categories(tienda=None, fecha_ini=None, fecha_fin=None) -> pd.DataFrame:
+    data = _get("categories", _build_params(tienda, fecha_ini, fecha_fin))
+    return pd.DataFrame(data)
+
+
+def get_category_evolution(tienda=None, fecha_ini=None, fecha_fin=None,
+                            top_n=5) -> pd.DataFrame:
+    data = _get("categories/evolution",
+                {"top_n": top_n, **_build_params(tienda, fecha_ini, fecha_fin)})
+    df = pd.DataFrame(data)
+    if not df.empty:
+        df["semana"] = pd.to_datetime(df["semana"])
+    return df
+
+
+# ─── ETL control ─────────────────────────────────────────────────────────────
+
+def upload_csv(file_bytes: bytes, filename: str) -> dict:
+    url = f"{_PREFIX}/etl/upload"
+    resp = requests.post(
+        url,
+        files={"file": (filename, file_bytes, "text/csv")},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def trigger_etl() -> dict:
+    return _post("etl/trigger")
+
+
+def reload_data() -> dict:
+    return _post("etl/reload")
+
+
+def get_etl_status() -> dict:
+    return _get("etl/status")

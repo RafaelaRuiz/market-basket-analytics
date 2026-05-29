@@ -1,0 +1,22 @@
+# Variables de entorno — nunca subir al repo
+.env
+.env.*
+!.env.example
+
+# Datos procesados (se regeneran con precompute.py)
+data/processed/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+
+# macOS
+.DS_Store

@@ -1,0 +1,14 @@
+data/
+.git/
+.claude/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+*.egg-info/
+dist/
+build/
+.DS_Store
