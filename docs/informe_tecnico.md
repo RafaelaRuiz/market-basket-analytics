@@ -1,5 +1,8 @@
 # Informe Técnico: Análisis y Modelado Analítico de Transacciones de Supermercado
 
+A00395548 | Silem Nabib
+A00395368 | Rafaela Ruiz 
+
 ## 1. Descripción de los Datos
 
 ### 1.1 Fuente y Formato

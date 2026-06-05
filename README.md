@@ -1,75 +1,134 @@
 # Market Basket Analytics
 
-Dashboard de analítica de transacciones de supermercado.
-Construido con **Streamlit + Pandas + Plotly + Scikit-learn**, desplegado en **Google Cloud Run**.
+Construido con Streamlit, Pandas, Plotly y Scikit-learn. Desplegado en Google Cloud Run.
+
+## Descripción General
+
+Market Basket Analytics analiza más de 1.1 millones de transacciones de supermercado provenientes de 4 puntos de venta durante 6 meses (enero-junio 2013). La solución integra:
+
+- Analítica descriptiva: KPIs, visualizaciones exploratorias
+- Segmentación de clientes: K-Means clustering en 4 perfiles
+- Recomendación de productos: Reglas de asociación y similitud coseno
+- Incorporación de nuevos datos: Pipeline ETL automatizado
+- Despliegue en la nube: Google Cloud Run + Cloud Storage
+
+## Características Clave
+
+- 1,108,951 transacciones procesadas (10.6 millones de ítems)
+- 131,186 clientes únicos segmentados en 4 perfiles
+- 3.8 millones de reglas de asociación para recomendaciones
+- 5 páginas interactivas con filtros globales
+- Despliegue automático con Docker y Cloud Run
 
 ## Módulos
 
 | Página | Descripción |
 |--------|-------------|
-| 📊 Resumen Ejecutivo | KPIs, Top 10 productos y clientes, días pico, categorías |
-| 📈 Visualizaciones Analíticas | Series de tiempo, boxplots, heatmap de correlación |
-| 🔬 Segmentación de Clientes | Clustering K-Means con visualización PCA |
-| 🤝 Recomendador | Reglas de asociación (FPGrowth) + filtrado colaborativo |
-| 📥 Nuevos Datos | Incorporar nuevos CSV y regenerar análisis automáticamente |
+| Resumen Ejecutivo | KPIs, Top 10 productos y clientes, días pico, distribución de categorías |
+| Visualizaciones Analíticas | Series de tiempo, boxplots, heatmap de correlación |
+| Segmentación de Clientes | Clustering K-Means con visualización PCA y estadísticas por segmento |
+| Recomendador | Reglas de asociación por producto, similitud coseno por cliente |
+| Nuevos Datos | Upload de CSV, validación y regeneración automática de análisis |
 
-## Desarrollo local
+## Instalación Local
+
+### 1. Requisitos
+
+- Python 3.12 o superior
+- pip o conda
+
+### 2. Clonar y configurar
 
 ```bash
-# 1. Instalar dependencias
+git clone https://github.com/SilemNabib/market-basket-analytics
+cd market-basket-analytics
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
+```
 
-# 2. Generar datasets procesados (una vez)
+### 3. Generar datasets procesados (una sola vez)
+
+```bash
 python -m src.etl.precompute
+```
 
-# 3. Ejecutar la app
+Esto crea los archivos Parquet en `data/processed/`.
+
+### 4. Ejecutar el proyecto
+
+**Terminal 1 — Streamlit (Frontend):**
+```bash
 streamlit run app/main.py
 ```
 
-## Con Google Cloud Storage
-
+**Terminal 2 — FastAPI (Backend/API):**
 ```bash
-# Precomputo y upload a GCS
-python -m src.etl.precompute --bucket=<NOMBRE_BUCKET>
-
-# Ejecutar apuntando al bucket
-GCS_BUCKET=<NOMBRE_BUCKET> streamlit run app/main.py
+uvicorn api.main:app --reload --port 8000
 ```
+La aplicación Streamlit puede usar el API para consultas avanzadas, o ejecutarse de forma independiente.
 
-## Despliegue en Cloud Run
+### Endpoints del API (FastAPI)
 
-```bash
-# Build y push de la imagen
-gcloud builds submit --tag gcr.io/<PROJECT_ID>/market-basket-app
+Principales rutas disponibles en http://localhost:8000:
 
-# Deploy
-gcloud run deploy market-basket-app \
-  --image gcr.io/<PROJECT_ID>/market-basket-app \
-  --region us-central1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --set-env-vars GCS_BUCKET=<NOMBRE_BUCKET> \
-  --memory 2Gi \
-  --cpu 2 \
-  --timeout 300
-```
+- `GET /summary` - Resumen ejecutivo (KPIs generales)
+- `GET /summary/by_store` - Resumen por tienda
+- `GET /categories` - Top categorías
+- `GET /products` - Top productos
+- `GET /daily-summary` - Resumen diario
+- `GET /customers` - Estadísticas de clientes
+- `GET /segmentation` - Segmentación K-Means
+- `GET /recommender/by-product/{product_id}` - Reglas para producto
+- `GET /recommender/by-customer/{customer_id}` - Recomendaciones por cliente
 
-**IAM requerido:** La service account de Cloud Run necesita `roles/storage.objectViewer`
-(y `roles/storage.objectAdmin` si se usa la página de Nuevos Datos).
+Documentación interactiva: http://localhost:8000/docs (Swagger UI)
 
-## Estructura del proyecto
+## Estructura del Proyecto
 
 ```
 market-basket-analytics/
-├── data/raw/              # Datos originales (no en Docker)
-├── data/processed/        # Parquets generados por precompute.py
+├── data/
+│   ├── raw/                           # Datos originales (CSV)
+│   │   ├── Transactions/
+│   │   └── Products/
+│   └── processed/                     # Parquets procesados
 ├── src/
-│   ├── etl/               # loader.py, transformer.py, precompute.py
-│   ├── analytics/         # visualizations.py, segmentation.py, recommender.py
-│   └── utils/             # gcs.py (helper de datos)
+│   ├── etl/
+│   │   ├── loader.py                  # Carga de datos
+│   │   ├── transformer.py             # Transformación y agregación
+│   │   ├── precompute.py              # Pipeline de precomputo
+│   │   └── metadata.py                # Metadatos
+│   ├── analytics/
+│   │   ├── visualizations.py          # Gráficos Plotly
+│   │   ├── segmentation.py            # K-Means clustering
+│   │   └── recommender.py             # FPGrowth y similitud
+│   └── utils/
+│       ├── gcs.py                     # Helpers para GCS
+│       └── api_client.py
 ├── app/
-│   ├── main.py            # Punto de entrada
-│   └── pages/             # Páginas del dashboard
+│   ├── main.py                        # Punto de entrada
+│   └── pages/
+│       ├── 1_Resumen_Ejecutivo.py
+│       ├── 2_Visualizaciones_Analiticas.py
+│       ├── 3_Segmentacion_Clientes.py
+│       ├── 4_Recomendador.py
+│       └── 5_Nuevos_Datos.py
+├── api/
+│   ├── main.py                        # FastAPI backend
+│   └── routers/
+├── docs/
+│   ├── statement.md                   # Especificaciones
+│   ├── plan.md                        # Plan de trabajo
+│   └── informe_tecnico.md             # Informe detallado
 ├── Dockerfile
+├── .dockerignore
 └── requirements.txt
 ```
+
+## Documentación
+
+Para más detalles técnicos y especificaciones:
+
+- [Informe Técnico](https://github.com/SilemNabib/market-basket-analytics/blob/main/docs/informe_tecnico.md) - Análisis detallado, metodología, resultados ML y conclusiones
+- [Especificaciones del Proyecto](https://github.com/SilemNabib/market-basket-analytics/blob/main/docs/statement.md) - Requerimientos y criterios de evaluación
