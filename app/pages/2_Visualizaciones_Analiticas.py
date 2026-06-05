@@ -16,9 +16,21 @@ tienda    = st.session_state.get("tienda_sel", "Todas")
 fecha_ini = st.session_state.get("fecha_ini")
 fecha_fin = st.session_state.get("fecha_fin")
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_analytics_data(tienda, fecha_ini, fecha_fin):
+    return api_client.get_analytics_data(tienda, fecha_ini, fecha_fin)
+
 st.title("📈 Visualizaciones Analíticas")
 st.caption(f"Tienda: **{tienda}**")
 st.markdown("---")
+
+try:
+    with st.spinner("Cargando visualizaciones..."):
+        data = load_analytics_data(tienda, fecha_ini, fecha_fin)
+except Exception as e:
+    st.error(f"Error: {e}")
+    st.stop()
 
 tab1, tab2, tab3 = st.tabs(["📅 Serie de Tiempo", "📦 Boxplot", "🔥 Heatmap Correlación"])
 
@@ -29,14 +41,14 @@ with tab1:
     gran     = c1.radio("Granularidad", ["Diaria", "Semanal"], horizontal=True)
     desglose = c2.toggle("Desglose por tienda", False)
     try:
-        df_daily = api_client.get_daily(tienda, fecha_ini, fecha_fin)
+        df_daily = data["daily"]
         st.plotly_chart(
             fig_serie_tiempo(df_daily, "D" if gran == "Diaria" else "W", desglose),
             use_container_width=True,
         )
         st.markdown("---")
         st.subheader("Evolución Semanal — Top 5 Categorías")
-        df_evol = api_client.get_category_evolution(tienda, fecha_ini, fecha_fin)
+        df_evol = data["category_evolution"]
         if not df_evol.empty:
             st.plotly_chart(fig_evolucion_categorias(df_evol), use_container_width=True)
     except Exception as e:
@@ -56,7 +68,7 @@ with tab2:
         }[x],
     )
     try:
-        df_cust = api_client.get_customer_features(tienda)
+        df_cust = data["customer_features"]
         st.plotly_chart(fig_boxplot(df_cust, variable_sel), use_container_width=True)
         with st.expander("📋 Estadísticas descriptivas"):
             desc = df_cust[variable_sel].describe().round(2)
@@ -69,7 +81,7 @@ with tab2:
 with tab3:
     st.subheader("Correlación entre Variables de Comportamiento")
     try:
-        df_cust = api_client.get_customer_features(tienda)
+        df_cust = data["customer_features"]
         st.plotly_chart(fig_heatmap_correlacion(df_cust), use_container_width=True)
         st.markdown("**Interpretación:**")
         st.markdown(

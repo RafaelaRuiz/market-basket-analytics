@@ -17,13 +17,21 @@ tienda    = st.session_state.get("tienda_sel", "Todas")
 fecha_ini = st.session_state.get("fecha_ini")
 fecha_fin = st.session_state.get("fecha_fin")
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_executive_summary_data(tienda, fecha_ini, fecha_fin):
+    return api_client.get_executive_summary_data(tienda, fecha_ini, fecha_fin)
+
 st.title("📊 Resumen Ejecutivo")
 st.caption(f"Tienda: **{tienda}**")
 st.markdown("---")
 
 try:
+    with st.spinner("Cargando resumen completo..."):
+        data = load_executive_summary_data(tienda, fecha_ini, fecha_fin)
+
     # ── KPI Cards ─────────────────────────────────────────────────────────────
-    s = api_client.get_summary(tienda, fecha_ini, fecha_fin)
+    s = data["summary"]
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("🛍️ Total Ítems",      f"{s['total_items']:,}",
@@ -38,11 +46,11 @@ try:
     # ── Top 10 Productos / Top 10 Clientes ────────────────────────────────────
     col1, col2 = st.columns(2)
     with col1:
-        df_prods = api_client.get_top_products(10, tienda, fecha_ini, fecha_fin)
+        df_prods = data["top_products"]
         st.plotly_chart(fig_top_productos(df_prods), use_container_width=True)
 
     with col2:
-        df_top_cli = api_client.get_top_customers(10, tienda, fecha_ini, fecha_fin)
+        df_top_cli = data["top_customers"]
         st.plotly_chart(fig_top_clientes(df_top_cli), use_container_width=True)
 
     st.markdown("---")
@@ -50,11 +58,11 @@ try:
     # ── Días pico / Categorías ────────────────────────────────────────────────
     col3, col4 = st.columns(2)
     with col3:
-        df_daily = api_client.get_daily(tienda, fecha_ini, fecha_fin)
+        df_daily = data["daily"]
         st.plotly_chart(fig_dias_pico(df_daily), use_container_width=True)
 
     with col4:
-        df_cats = api_client.get_categories(tienda, fecha_ini, fecha_fin)
+        df_cats = data["categories"]
         st.plotly_chart(fig_categorias_pie(df_cats), use_container_width=True)
 
     # ── Tabla detalle ─────────────────────────────────────────────────────────

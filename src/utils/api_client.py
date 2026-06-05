@@ -7,6 +7,7 @@ las funciones de visualización.
 """
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import pandas as pd
@@ -46,6 +47,29 @@ def _build_params(tienda=None, fecha_ini=None, fecha_fin=None) -> dict:
 def get_summary(tienda=None, fecha_ini=None, fecha_fin=None) -> dict:
     """KPIs principales: totales, clientes, deltas."""
     return _get("summary", _build_params(tienda, fecha_ini, fecha_fin))
+
+
+def get_executive_summary_data(tienda=None, fecha_ini=None, fecha_fin=None) -> dict:
+    """
+    Carga en paralelo los datasets usados por Resumen Ejecutivo.
+
+    Streamlit renderiza de arriba hacia abajo; si cada grafica dispara su propia
+    consulta, el usuario ve la pagina aparecer por partes. Este helper reduce la
+    espera total y entrega un bloque completo para pintar toda la vista.
+    """
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            "summary": executor.submit(get_summary, tienda, fecha_ini, fecha_fin),
+            "top_products": executor.submit(
+                get_top_products, 10, tienda, fecha_ini, fecha_fin
+            ),
+            "top_customers": executor.submit(
+                get_top_customers, 10, tienda, fecha_ini, fecha_fin
+            ),
+            "daily": executor.submit(get_daily, tienda, fecha_ini, fecha_fin),
+            "categories": executor.submit(get_categories, tienda, fecha_ini, fecha_fin),
+        }
+        return {key: future.result() for key, future in futures.items()}
 
 
 # ─── Products ────────────────────────────────────────────────────────────────
@@ -97,6 +121,19 @@ def get_category_evolution(tienda=None, fecha_ini=None, fecha_fin=None,
     if not df.empty:
         df["semana"] = pd.to_datetime(df["semana"])
     return df
+
+
+def get_analytics_data(tienda=None, fecha_ini=None, fecha_fin=None) -> dict:
+    """Carga en paralelo los datos compartidos por las visualizaciones."""
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {
+            "daily": executor.submit(get_daily, tienda, fecha_ini, fecha_fin),
+            "category_evolution": executor.submit(
+                get_category_evolution, tienda, fecha_ini, fecha_fin
+            ),
+            "customer_features": executor.submit(get_customer_features, tienda),
+        }
+        return {key: future.result() for key, future in futures.items()}
 
 
 # ─── Segmentación ────────────────────────────────────────────────────────────
