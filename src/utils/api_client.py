@@ -99,6 +99,56 @@ def get_category_evolution(tienda=None, fecha_ini=None, fecha_fin=None,
     return df
 
 
+# ─── Segmentación ────────────────────────────────────────────────────────────
+
+def get_kmeans(
+    k: int = 3,
+    features: list[str] | None = None,
+    tienda: int | None = None,
+) -> dict:
+    """
+    Ejecuta K-Means con k clusters.
+    Retorna dict con labels, coordenadas PCA, centroides, stats, inertia_curve.
+    """
+    from src.analytics.segmentation import AVAILABLE_FEATURES
+    feat = features or AVAILABLE_FEATURES
+    params = {"k": k, "features": feat}
+    if tienda is not None:
+        params["tienda"] = tienda
+    return _get("segmentation/kmeans", params)
+
+
+def get_segmentation_features() -> list[dict]:
+    """Lista de features disponibles para segmentación."""
+    return _get("segmentation/features")
+
+
+# ─── Recomendador ─────────────────────────────────────────────────────────────
+
+def get_products_with_rules() -> list[int]:
+    """Productos que aparecen como antecedentes en las reglas de asociación."""
+    return _get("recommender/products")
+
+
+def get_available_customers() -> list[int]:
+    """IDs de clientes disponibles para recomendaciones personalizadas."""
+    return _get("recommender/customers")
+
+
+def get_rules_for_product(product_id: int, top_n: int = 10) -> pd.DataFrame:
+    """Reglas de asociación para un producto dado."""
+    data = _get(f"recommender/rules/{product_id}", {"top_n": top_n})
+    return pd.DataFrame(data)
+
+
+def get_recommendations_for_customer(
+    customer_id: int, top_n: int = 5
+) -> pd.DataFrame:
+    """Categorías recomendadas para un cliente por similitud coseno."""
+    data = _get(f"recommender/customer/{customer_id}", {"top_n": top_n})
+    return pd.DataFrame(data)
+
+
 # ─── ETL control ─────────────────────────────────────────────────────────────
 
 def upload_csv(file_bytes: bytes, filename: str) -> dict:

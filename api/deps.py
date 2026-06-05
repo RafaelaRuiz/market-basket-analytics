@@ -19,11 +19,12 @@ _PROCESSED = os.path.normpath(
 class DataStore:
     """Contenedor singleton de los DataFrames en memoria."""
 
-    flat:      pd.DataFrame | None = None
-    customers: pd.DataFrame | None = None
-    daily:     pd.DataFrame | None = None
-    products:  pd.DataFrame | None = None
-    loaded:    bool = False
+    flat:        pd.DataFrame | None = None
+    customers:   pd.DataFrame | None = None
+    daily:       pd.DataFrame | None = None
+    products:    pd.DataFrame | None = None
+    rules:       pd.DataFrame | None = None  # association_rules.parquet
+    loaded:      bool = False
 
 
 store = DataStore()
@@ -49,6 +50,14 @@ def load_store():
     # Garantizar tipos de fecha
     store.flat["fecha"]  = pd.to_datetime(store.flat["fecha"])
     store.daily["fecha"] = pd.to_datetime(store.daily["fecha"])
+
+    # Reglas de asociación (opcionales — se generan con precompute)
+    rules_path = _resolve("association_rules.parquet")
+    try:
+        store.rules = pd.read_parquet(rules_path)
+    except Exception:
+        store.rules = None
+
     store.loaded = True
 
 

@@ -32,6 +32,7 @@ from src.etl.transformer import (
     explode_baskets,
     map_categories,
 )
+from src.analytics.recommender import compute_association_rules
 
 DATA_RAW = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw")
@@ -215,6 +216,22 @@ def run(bucket: str | None = None,
     }
     for fname, df in outputs.items():
         _save_parquet(df, _parquet_path(data_processed, fname), bucket, fname)
+
+    # ── 6b. Reglas de asociación (FPGrowth sobre muestra 30%) ────────────────
+    rules_path = _parquet_path(data_processed, "association_rules.parquet")
+    existing_rules = _load_parquet_if_exists(rules_path)
+    if existing_rules is None or force:
+        _log("Calculando reglas de asociación (FPGrowth, muestra 30%)...")
+        try:
+            df_rules = compute_association_rules(
+                df_flat, sample_frac=0.30, min_support=0.01, min_confidence=0.3
+            )
+            _save_parquet(df_rules, rules_path, bucket, "association_rules.parquet")
+            _log(f"  {len(df_rules):,} reglas generadas")
+        except Exception as e:
+            _log(f"  ⚠️  Error en FPGrowth: {e}")
+    else:
+        _log("  Reglas de asociación ya existen (usa --force para recalcular)")
 
     # ── 7. Actualizar metadata ────────────────────────────────────────────────
     for f in new_files:

@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.deps import load_store
 from api.routers import summary, products, customers, daily, categories, etl
+from api.routers import segmentation, recommender
 
 
 @asynccontextmanager
@@ -53,12 +54,14 @@ app.add_middleware(
 
 # Registrar routers bajo /api/v1
 PREFIX = "/api/v1"
-app.include_router(summary.router,    prefix=PREFIX)
-app.include_router(products.router,   prefix=PREFIX)
-app.include_router(customers.router,  prefix=PREFIX)
-app.include_router(daily.router,      prefix=PREFIX)
-app.include_router(categories.router, prefix=PREFIX)
-app.include_router(etl.router,        prefix=PREFIX)
+app.include_router(summary.router,      prefix=PREFIX)
+app.include_router(products.router,     prefix=PREFIX)
+app.include_router(customers.router,    prefix=PREFIX)
+app.include_router(daily.router,        prefix=PREFIX)
+app.include_router(categories.router,   prefix=PREFIX)
+app.include_router(etl.router,          prefix=PREFIX)
+app.include_router(segmentation.router, prefix=PREFIX)
+app.include_router(recommender.router,  prefix=PREFIX)
 
 
 @app.get("/health")
