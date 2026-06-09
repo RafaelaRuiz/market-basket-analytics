@@ -4,7 +4,7 @@
 !.env.example
 
 # Datos procesados (se regeneran con precompute.py)
-data/processed/
+
 
 # Python
 __pycache__/
