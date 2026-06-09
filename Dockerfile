@@ -1,6 +1,6 @@
-# Cloud Run Service — Streamlit Dashboard (Dockerfile.app)
-# Consume la FastAPI vía API_URL. No lee GCS directamente.
-# Variables requeridas: API_URL
+# Backend FastAPI para Render u otros PaaS.
+# Lee data/raw y data/processed, y arranca con un bootstrap que genera
+# los parquet si faltan antes de levantar Uvicorn.
 
 FROM python:3.13-slim
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
@@ -8,12 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY src/        ./src/
-COPY app/        ./app/
-COPY .streamlit/ ./.streamlit/
-EXPOSE 8080
-ENV PORT=8080
-CMD ["streamlit", "run", "app/main.py", \
-     "--server.port=8080", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true"]
+COPY src/ ./src/
+COPY api/ ./api/
+COPY data/ ./data/
+EXPOSE 8000
+ENV PORT=8000
+CMD ["python", "-m", "api.startup"]
