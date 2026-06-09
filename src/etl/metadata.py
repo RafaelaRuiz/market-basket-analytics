@@ -19,6 +19,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+from src.utils.mongo import load_metadata_doc, save_metadata_doc
+
 METADATA_FILENAME = "_metadata.json"
 
 
@@ -28,9 +30,13 @@ def _local_path(processed_dir: str) -> str:
 
 def load_metadata(processed_dir: str, bucket: str | None = None) -> dict:
     """
-    Carga el metadata desde GCS o local.
+    Carga el metadata desde MongoDB, GCS o local.
     Si no existe, retorna un dict vacío con estructura válida.
     """
+    mongo_metadata = load_metadata_doc()
+    if mongo_metadata is not None:
+        return mongo_metadata
+
     if bucket:
         gcs_path = f"gs://{bucket}/processed/{METADATA_FILENAME}"
         try:
@@ -54,7 +60,7 @@ def load_metadata(processed_dir: str, bucket: str | None = None) -> dict:
 
 def save_metadata(metadata: dict, processed_dir: str, bucket: str | None = None):
     """
-    Guarda el metadata actualizado local y opcionalmente en GCS.
+    Guarda el metadata actualizado local y opcionalmente en MongoDB y GCS.
     """
     metadata["last_updated"] = datetime.now(timezone.utc).isoformat()
 
@@ -63,6 +69,11 @@ def save_metadata(metadata: dict, processed_dir: str, bucket: str | None = None)
     local = _local_path(processed_dir)
     with open(local, "w") as f:
         json.dump(metadata, f, indent=2)
+
+    try:
+        save_metadata_doc(metadata)
+    except Exception as e:
+        print(f"[metadata] ⚠️  No se pudo guardar metadata en MongoDB: {e}")
 
     # Sube a GCS si aplica
     if bucket:

@@ -33,6 +33,7 @@ from src.etl.transformer import (
     map_categories,
 )
 from src.analytics.recommender import compute_association_rules
+from src.utils.mongo import sync_uploaded_transactions
 
 DATA_RAW = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw")
@@ -169,9 +170,13 @@ def run(bucket: str | None = None,
     os.makedirs(data_processed, exist_ok=True)
     t0 = time.time()
 
+    transactions_dir = os.path.join(data_raw, "Transactions")
+    synced = sync_uploaded_transactions(transactions_dir)
+    if synced:
+        _log(f"Sincronizados {synced} CSV de transacciones desde MongoDB")
+
     # ── 1. Metadata: qué ya fue procesado ────────────────────────────────────
     metadata = {} if force else load_metadata(data_processed, bucket)
-    transactions_dir = os.path.join(data_raw, "Transactions")
     new_files = (
         sorted(glob.glob(os.path.join(transactions_dir, "*.csv")))
         if force

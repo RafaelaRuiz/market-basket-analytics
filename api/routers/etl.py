@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 
 from api.deps import DataStore, get_store, load_store
 from src.etl.metadata import load_metadata
+from src.utils.mongo import save_uploaded_transaction
 
 router = APIRouter(prefix="/etl", tags=["etl"])
 
@@ -63,6 +64,12 @@ async def upload_csv(file: UploadFile = File(...)):
     with open(local_path, "wb") as f:
         f.write(content)
 
+    mongo_warning = None
+    try:
+        save_uploaded_transaction(file.filename, content)
+    except Exception as e:
+        mongo_warning = str(e)
+
     # Subir a GCS
     if _GCS_BUCKET:
         try:
@@ -81,7 +88,10 @@ async def upload_csv(file: UploadFile = File(...)):
                 }
             )
 
-    return {"message": "CSV recibido y almacenado.", "filename": file.filename}
+    response = {"message": "CSV recibido y almacenado.", "filename": file.filename}
+    if mongo_warning:
+        response["mongo_warning"] = mongo_warning
+    return response
 
 
 @router.post("/trigger")
