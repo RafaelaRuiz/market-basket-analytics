@@ -30,7 +30,12 @@ def get_client():
     if _CLIENT is None:
         from pymongo import MongoClient
 
-        _CLIENT = MongoClient(_uri(), serverSelectionTimeoutMS=5000)
+        try:
+            _CLIENT = MongoClient(_uri(), serverSelectionTimeoutMS=5000)
+            _CLIENT.admin.command("ping")
+        except Exception as exc:
+            print(f"[mongo] ⚠️  No se pudo conectar a MongoDB: {exc}")
+            _CLIENT = None
     return _CLIENT
 
 
@@ -45,22 +50,29 @@ def load_metadata_doc() -> dict | None:
     db = get_db()
     if db is None:
         return None
-    doc = db.etl_metadata.find_one({"_id": "current"})
-    if not doc:
+    try:
+        doc = db.etl_metadata.find_one({"_id": "current"})
+        if not doc:
+            return None
+        metadata = doc.get("metadata") or {}
+        return metadata if isinstance(metadata, dict) else None
+    except Exception as exc:
+        print(f"[mongo] ⚠️  No se pudo leer metadata de MongoDB: {exc}")
         return None
-    metadata = doc.get("metadata") or {}
-    return metadata if isinstance(metadata, dict) else None
 
 
 def save_metadata_doc(metadata: dict) -> None:
     db = get_db()
     if db is None:
         return
-    db.etl_metadata.replace_one(
-        {"_id": "current"},
-        {"_id": "current", "metadata": metadata},
-        upsert=True,
-    )
+    try:
+        db.etl_metadata.replace_one(
+            {"_id": "current"},
+            {"_id": "current", "metadata": metadata},
+            upsert=True,
+        )
+    except Exception as exc:
+        print(f"[mongo] ⚠️  No se pudo guardar metadata en MongoDB: {exc}")
 
 
 def save_uploaded_transaction(filename: str, content: bytes) -> None:
@@ -68,13 +80,16 @@ def save_uploaded_transaction(filename: str, content: bytes) -> None:
     if db is None:
         return
 
-    from gridfs import GridFS
+    try:
+        from gridfs import GridFS
 
-    fs = GridFS(db, collection="transaction_uploads")
-    existing = fs.find_one({"filename": filename})
-    if existing is not None:
-        existing.delete()
-    fs.put(content, filename=filename, metadata={"kind": "transaction_csv"})
+        fs = GridFS(db, collection="transaction_uploads")
+        existing = fs.find_one({"filename": filename})
+        if existing is not None:
+            existing.delete()
+        fs.put(content, filename=filename, metadata={"kind": "transaction_csv"})
+    except Exception as exc:
+        print(f"[mongo] ⚠️  No se pudo guardar el CSV en MongoDB: {exc}")
 
 
 def sync_uploaded_transactions(target_dir: str) -> int:
@@ -82,15 +97,19 @@ def sync_uploaded_transactions(target_dir: str) -> int:
     if db is None:
         return 0
 
-    from gridfs import GridFS
+    try:
+        from gridfs import GridFS
 
-    fs = GridFS(db, collection="transaction_uploads")
-    os.makedirs(target_dir, exist_ok=True)
-    count = 0
-    for file_obj in fs.find({"metadata.kind": "transaction_csv"}):
-        output_path = os.path.join(target_dir, file_obj.filename)
-        if not os.path.exists(output_path):
-            with open(output_path, "wb") as handle:
-                handle.write(file_obj.read())
-        count += 1
-    return count
+        fs = GridFS(db, collection="transaction_uploads")
+        os.makedirs(target_dir, exist_ok=True)
+        count = 0
+        for file_obj in fs.find({"metadata.kind": "transaction_csv"}):
+            output_path = os.path.join(target_dir, file_obj.filename)
+            if not os.path.exists(output_path):
+                with open(output_path, "wb") as handle:
+                    handle.write(file_obj.read())
+            count += 1
+        return count
+    except Exception as exc:
+        print(f"[mongo] ⚠️  No se pudieron sincronizar CSV desde MongoDB: {exc}")
+        return 0
