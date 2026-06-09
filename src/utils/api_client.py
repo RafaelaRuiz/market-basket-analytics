@@ -12,8 +12,13 @@ from datetime import date
 
 import pandas as pd
 import requests
+import streamlit as st
 
-_API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
+_API_URL = (
+    st.secrets.get("API_URL")
+    or os.environ.get("API_URL")
+    or "http://localhost:8000"
+).rstrip("/")
 _PREFIX  = f"{_API_URL}/api/v1"
 _TIMEOUT = 30  # segundos
 
