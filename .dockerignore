@@ -1,6 +1,5 @@
 .git/
 .claude/
-data/processed/
 __pycache__/
 **/__pycache__/
 *.pyc
